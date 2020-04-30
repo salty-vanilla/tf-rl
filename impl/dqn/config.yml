@@ -1,0 +1,11 @@
+logdir: logs/20200429-164325/
+test_episode: 3000
+
+replay_memory:
+  capacity: 10000
+
+fit_params:
+  batch_size: 128
+  episodes: 5000
+  target_update: 100
+  save_steps: 100

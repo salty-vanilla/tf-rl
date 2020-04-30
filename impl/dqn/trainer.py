@@ -4,6 +4,7 @@ import gym
 import os
 import datetime
 import random
+from pathlib import Path
 from itertools import count
 import time
 from replay_memory import ReplayMemory, Transition
@@ -18,7 +19,8 @@ class Trainer:
                  gamma=0.999,
                  eps_start=0.99,
                  eps_end=0.05,
-                 eps_decay=200):
+                 eps_decay=200,
+                 logdir=None):
         self.env = env
         self.n_actions = n_actions
         self.memory = memory
@@ -40,7 +42,9 @@ class Trainer:
         self.target_model.set_weights(self.policy_model.get_weights())
 
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.writer = tf.summary.create_file_writer("logs/" + current_time)
+        self.logdir = Path(logdir) if logdir else Path(f'logs/{current_time}')
+        self.logdir.mkdir(parents=True, exist_ok=True)
+        self.writer = tf.summary.create_file_writer(str(self.logdir))
 
     def select_action(self, state):
         sample = np.random.rand()
@@ -107,7 +111,8 @@ class Trainer:
 
     def fit(self, batch_size=32,
             episodes=100,
-            target_update=10):
+            target_update=10,
+            save_steps=100):
         for episode in range(1, episodes + 1):
             print(f'\nepisode {episode} / {episodes}')
             start = time.time()
@@ -154,4 +159,8 @@ class Trainer:
 
             if episode % target_update == 0:
                 self.target_model.set_weights(self.policy_model.get_weights())
+            if episode % save_steps == 0:
+                (self.logdir / 'model' ).mkdir(exist_ok=True)
+                self.policy_model.save_weights(str(self.logdir / 'model' / f'model_{episode}.h5'))
+
         print()

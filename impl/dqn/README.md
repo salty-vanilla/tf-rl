@@ -6,5 +6,5 @@
 * CartPole-v0
     * state : image
 
-    
+<img src="assets/play.gif">    
 <img src="assets/reward_histrory.png">

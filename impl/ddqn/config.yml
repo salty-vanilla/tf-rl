@@ -1,0 +1,14 @@
+logdir: logs/20200501-173730/
+test_episode: 500
+
+env_params:
+  state_mode: 'feature'
+
+replay_memory:
+  capacity: 10000
+
+fit_params:
+  batch_size: 128
+  episodes: 50000
+  target_update: 100
+  save_steps: 20

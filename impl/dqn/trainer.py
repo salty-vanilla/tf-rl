@@ -4,15 +4,17 @@ import gym
 import os
 import datetime
 import random
+import copy
 from pathlib import Path
 from itertools import count
 import time
 from replay_memory import ReplayMemory, Transition
-from model import Model
 
 
 class Trainer:
     def __init__(self, input_shape,
+                 policy_model,
+                 target_model,
                  env,
                  n_actions,
                  memory,
@@ -30,11 +32,11 @@ class Trainer:
         self.eps_decay = eps_decay
 
         # self.optimizer = tf.keras.optimizers.RMSprop()
-        self.optimizer = tf.keras.optimizers.Adam(1e-4)
+        self.optimizer = tf.keras.optimizers.Adam(1e-2)
 
-        self.policy_model = Model(env.action_space.n)
+        self.policy_model = policy_model
         self.policy_model.build((None, *input_shape))
-        self.target_model = Model(env.action_space.n)
+        self.target_model = target_model
         self.target_model.build((None, *input_shape))
 
         self.steps_done = 0
@@ -84,20 +86,20 @@ class Trainer:
             non_final_next_states = tf.concat([[s if s is not None else tf.zeros_like(state_batch[0]) 
                                                 for s in batch.next_state]],
                                             axis=0)
-        
+
+            next_state_values = tf.zeros(shape=(batch_size, ),
+                                             dtype=tf.float32)
+            next_state_values_ = tf.reduce_max(self.target_model(non_final_next_states,
+                                                                training=False),
+                                               axis=-1)
+            next_state_values = tf.where(non_final_mask, next_state_values_, next_state_values)
+            expected_state_action_values = (next_state_values * self.gamma) + reward_batch
+    
             with tf.GradientTape() as tape:           
                 state_action_values = tf.reduce_sum(
                     self.policy_model(state_batch, training=True) * tf.one_hot(action_batch, self.n_actions),
                     axis=1
                 )
-
-                next_state_values = tf.zeros(shape=(batch_size, ),
-                                             dtype=tf.float32)
-                preds = tf.reduce_max(self.target_model(non_final_next_states,
-                                                        training=False),
-                                      axis=-1)
-                next_state_values = tf.where(non_final_mask, preds, next_state_values)
-                expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
                 loss = tf.reduce_mean(loss_fn(state_action_values, expected_state_action_values))
 
@@ -117,27 +119,16 @@ class Trainer:
             print(f'\nepisode {episode} / {episodes}')
             start = time.time()
 
-            self.env.reset()
-            last_screen = self.env.get_screen()
-            current_screen = self.env.get_screen()
-            state = current_screen - last_screen
-
+            state = self.env.reset()
             rewards = 0
             losses = 0
             for t in count():
+                state = tf.constant(state, dtype=tf.float32)
                 action = self.select_action(tf.expand_dims(state, 0))
                 action = np.array(action)
-                _, reward, done, _ = self.env.step(action)
+                next_state, reward, done, _ = self.env.step(action)
                 reward = tf.constant(reward, dtype=tf.float32)
         
-                last_screen = current_screen
-                current_screen = self.env.get_screen()
-
-                if not done:
-                    next_state = current_screen - last_screen
-                else:
-                    next_state = None
-                
                 self.memory.push(state, action, next_state, reward)
 
                 state = next_state

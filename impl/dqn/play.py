@@ -7,16 +7,16 @@ import matplotlib
 import matplotlib.pyplot as plt
 from pathlib import Path
 from matplotlib.animation import FuncAnimation, ImageMagickWriter, FFMpegWriter
-from cartpole import env
-from model import Model
+sys.path.append('../../')
+from envs import CartPoleEnv
+from model import CNN, MLP
 
 
 def display_frames_as_gif(dst_path, frames):
     """
     Displays a list of frames as a gif, with controls
     """
-    plt.figure(figsize=(frames[0].shape[1]//10, frames[0].shape[0]//10),
-               dpi=100)
+    plt.figure(figsize=(frames[0].shape[1]//100, frames[0].shape[0]//100))
     patch = plt.imshow(frames[0])
     plt.axis('off')
     def animate(i):
@@ -42,35 +42,34 @@ with open(yml_path) as f:
     config = yaml.load(f)
 logdir = Path(config['logdir'])
 
-model = Model(env.action_space.n)
-model.build((None, *env.get_screen_shape()))
+env = CartPoleEnv(**config['env_params'])
+
+if config['env_params']['state_mode'] == 'image':
+    model = CNN(env.action_space.n)
+else:
+    model = MLP(env.action_space.n)
+
+model.build((None, *env.get_state_shape()))
 model.load_weights(str(logdir / 'model' / f'model_{config["test_episode"]}.h5'))
 
 env.reset()
-last_screen = env.get_screen()
-current_screen = env.get_screen()
-state = current_screen - last_screen
-frames = [current_screen]
+
+state = env.reset()
+frames = [env.render(mode='rgb_array')]
 
 rewards = 0
 for t in count():
+    state = tf.constant(state, dtype=tf.float32)
     action = tf.argmax(model(tf.expand_dims(state, 0)), axis=1)
     action = tf.reshape(action, ())
     action = np.array(action)
-    _, reward, done, _ = env.step(action)
+    next_state, reward, done, _ = env.step(action)
 
-    last_screen = current_screen
-    current_screen = env.get_screen()
-
-    frames.append(current_screen)
+    frames.append(env.render(mode='rgb_array'))
     rewards += reward
 
-    if not done:
-        next_state = current_screen - last_screen
-    else:
-        next_state = None
+    if done:
         break
-
     state = next_state
 
 display_frames_as_gif(logdir / 'play.gif', frames)

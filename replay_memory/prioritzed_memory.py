@@ -34,7 +34,8 @@ class PrioritizedMemory(Memory):
         batch = []
         indices = []
         weights = np.empty(batch_size, dtype='float32')
-        beta = np.minimum(1., self.beta + (1-self.beta)*self.beta_increment)
+        self.beta += self.beta_increment
+        beta = np.minimum(1., self.beta)
         total = self.tree.total()
         for i, r in enumerate(np.random.uniform(0, total, (batch_size, ))):
             index, priority, data = self.tree.get(r)

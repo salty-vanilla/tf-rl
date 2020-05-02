@@ -8,7 +8,9 @@ import copy
 from pathlib import Path
 from itertools import count
 import time
-from replay_memory import ReplayMemory, Transition
+import sys
+sys.path.append('../../')
+from replay_memory import Transition
 
 
 class Trainer:
@@ -67,10 +69,10 @@ class Trainer:
     def update_model(self, batch_size):
         if len(self.memory) < batch_size:
             return 0.
-        transitions = self.memory.sample(batch_size)
-        
+        transitions, indices, weights = self.memory.sample(batch_size)
         batch = Transition(*zip(*transitions))
-        
+        weights = tf.constant(weights, dtype=tf.float32)
+
         state_batch = tf.concat([batch.state], axis=0)
         action_batch = tf.concat([batch.action], axis=0)
         reward_batch = tf.concat([batch.reward], axis=0)
@@ -79,7 +81,7 @@ class Trainer:
         def _update(state_batch, 
                     action_batch,
                     reward_batch):
-            loss_fn = tf.keras.losses.Huber()
+            loss_fn = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
 
             non_final_mask = tf.constant(tuple(map(lambda s: s is not None,
                                                 batch.next_state)))
@@ -94,21 +96,28 @@ class Trainer:
                                                axis=-1)
             next_state_values = tf.where(non_final_mask, next_state_values_, next_state_values)
             expected_state_action_values = (next_state_values * self.gamma) + reward_batch
-    
+        
             with tf.GradientTape() as tape:           
                 state_action_values = tf.reduce_sum(
                     self.policy_model(state_batch, training=True) * tf.one_hot(action_batch, self.n_actions),
                     axis=1
                 )
 
-                loss = tf.reduce_mean(loss_fn(state_action_values, expected_state_action_values))
+                loss_batch = loss_fn(state_action_values, expected_state_action_values)
+                loss = tf.reduce_mean(loss_batch*weights)
 
             grads = tape.gradient(loss, self.policy_model.trainable_variables)
             grads = [tf.clip_by_value(g, -1., 1.) for g in grads]
             self.optimizer.apply_gradients(zip(grads, self.policy_model.trainable_variables))
-            return loss
+            return loss, loss_batch
 
-        return np.array(_update(state_batch, action_batch, reward_batch))
+        loss, loss_batch = _update(state_batch, action_batch, reward_batch)
+
+        loss_batch = np.array(loss_batch)
+        for index, error in zip(indices, loss_batch):
+            self.memory.update(index, error)
+
+        return np.array(loss)
 
 
     def fit(self, batch_size=32,

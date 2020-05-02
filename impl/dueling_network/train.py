@@ -2,11 +2,11 @@ import yaml
 import sys
 import shutil
 from trainer import Trainer
-from replay_memory import ReplayMemory
 from pathlib import Path
 sys.path.append('../../')
 from envs import CartPoleEnv
 from model import CNN, MLP
+from replay_memory import SimpleMemory, PrioritizedMemory
 
 
 yml_path = sys.argv[1]
@@ -18,7 +18,7 @@ shutil.copy(yml_path, logdir/'config.yml')
 
 env = CartPoleEnv(**config['env_params'])
 
-memory = ReplayMemory(**config['replay_memory'])
+memory = PrioritizedMemory(**config['replay_memory'])
 
 if config['env_params']['state_mode'] == 'image':
     policy_model = CNN(env.action_space.n)

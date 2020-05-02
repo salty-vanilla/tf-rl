@@ -1,12 +1,13 @@
+import sys
+import numpy as np
+sys.path.append(__file__)
 import random
 from collections import namedtuple
+from base_memory import Memory
+from replay_memory import Transition
 
 
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
-
-                        
-class ReplayMemory:
+class SimpleMemory(Memory):
     def __init__(self, capacity):
         self.capacity = capacity
         self.memory = []
@@ -19,7 +20,10 @@ class ReplayMemory:
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+        indices = np.random.randint(0, len(self), size=(batch_size, ))
+        batch = [self.memory[i] for i in indices]
+        weights = np.ones(shape=(batch_size, ))
+        return batch, indices, weights
 
     def __len__(self):
         return len(self.memory)

@@ -1,4 +1,4 @@
-# Deep Reinforcement Learning with Double Q-learning
+# Noisy Networks for Exploration
 ## Environments
 * python 3.6.9
 * tensorflow 2.1.0

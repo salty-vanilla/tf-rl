@@ -1,0 +1,20 @@
+logdir: logs/20200507-012230/
+test_episode: 2000
+
+env_params:
+  state_mode: 'feature'
+
+replay_memory:
+  capacity: 10000
+
+trainer_params:
+  gamma: 0.999
+  min_q_value: 0.
+  max_q_value: 20.0
+  n_bins: 51
+
+fit_params:
+  batch_size: 128
+  episodes: 50000
+  target_update: 100
+  save_steps: 100
